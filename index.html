@@ -1,0 +1,213 @@
+<!--
+Google IO 2012/2013 HTML5 Slide Template
+
+Authors: Eric Bidelman <ebidel@gmail.com>
+         Luke Mahé <lukem@google.com>
+
+URL: https://code.google.com/p/io-2012-slides
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <title></title>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="chrome=1">
+  <!--<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">-->
+  <!--<meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+  <!--This one seems to work all the time, but really small on ipad-->
+  <!--<meta name="viewport" content="initial-scale=0.4">-->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" media="all" href="theme/css/default.css">
+  <link rel="stylesheet" media="only screen and (max-device-width: 480px)" href="theme/css/phone.css">
+  <base target="_blank"> <!-- This amazingness opens all links in a new tab. -->
+  <script data-main="js/slides" src="js/require-1.0.8.min.js"></script>
+</head>
+<body style="opacity: 0">
+
+<slides class="layout-widescreen">
+  <slide class="title-slide segue nobackground">
+    <aside class="gdbar"><img src="images/scala-icon.png"></aside>
+    <!-- The content of this hgroup is replaced programmatically through the slide_config.json. -->
+    <hgroup class="auto-fadein">
+      <h1 data-config-title><!-- populated from slide_config.json --></h1>
+      <h2 data-config-subtitle><!-- populated from slide_config.json --></h2>
+      <p data-config-presenter><!-- populated from slide_config.json --></p>
+    </hgroup>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Applicative Style</h2>
+    </hgroup>
+    <article>
+      <ul>
+        <li>Applicative Functorを使った記述スタイル</li>
+        <li>『<a href="http://www.soi.city.ac.uk/%7Eross/papers/Applicative.html">Applicative programming with effects</a>』で紹介された</li>
+      </ul>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Example in Haskell</h2>
+    </hgroup>
+    <article>
+      <p>Haskellの場合<pre class="prettyprint" data-lang="haskell">do
+  i <- Just "a"
+  j <- Just "b"
+  return $ i ++ j</pre>を<pre class="prettyprint" data-lang="haskell">(++) <$> Just "a" <*> Just "b"</pre>と書く</p>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Example in Scala</h2>
+    </hgroup>
+    <article>
+      <p>Scalaの場合<pre class="prettyprint" data-lang="scala">for {
+  a <- Option("a")
+  b <- Option("b")
+} yield a + b</pre></p>
+      <p>これをどう書くかという話</p>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Scalaz Apply Syntax</h2>
+    </hgroup>
+    <article>
+      <pre class="prettyprint" data-lang="scala">^(Option("a"), Option("b"))(_ + _)</pre>
+      <p>Pros:</p>
+      <ul>
+        <li>中間生成オブジェクトが少なくオーバーヘッドが少ない</li>
+        <li>Applicative styleをやりたいならこれで書けるものはこれで書くというのが無難</li>
+      </ul>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Scalaz Apply Syntax</h2>
+    </hgroup>
+    <article>
+      <p>Cons:</p>
+      <ul>
+        <li>7引数の関数までしか定義されていない(applyを直接呼べば12引数までOK)
+        <pre class="prettyprint" data-lang="scala">val F = implicitly[Apply[Option]]
+F.apply2(Option(1), Option(2))(_ + _)</pre></li>
+        <li>複数の型パラメータを受け取る型コンストラクタ(EitherやFunction2など)でうまく動作しない
+        <!-- <li><a href="https://github.com/scalaz/scalaz/issues/144">alternative applicative builder syntax doesn't work for type-classes of multiple arity · Issue #144 · scalaz/scalaz</a></li> -->
+        <pre class="prettyprint" data-lang="scala">^("a".right[Int], "b".right[Int])(_ + _) // not work</pre></li>
+        <li>Unapplyを使うことで回避可能</li>
+        <pre class="prettyprint" data-lang="scala">val F = Unapply.unapplyMAB2[Monad, \/, Int, String].TC
+F.apply2("a".right[Int], "b".right[Int])(_ + _)</pre>
+      </ul>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Scalaz Applicative Builder</h2>
+    </hgroup>
+    <article>
+      <pre class="prettyprint" data-lang="scala">(Option("a") |@| Option("b"))(_ + _)</pre>
+      <p>Pros:</p>
+      <ul>
+        <li>複数の型パラメータを受け取る型コンストラクタでも動作する
+        <pre class="prettyprint" data-lang="scala">("a".right[Int] |@| "b".right[Int])(_ + _) // work</pre></li>
+        <li>Apply syntaxで書けないものをApplicative builderで書くのが良いかも</li>
+      </ul>
+      <p>Cons:</p>
+      <ul>
+        <li>中間オブジェクトができるのでApply syntaxよりパフォーマンスが悪い</li>
+        <li>Applyの引数の制限は同じ</li>
+      </ul>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Effectful</h2>
+    </hgroup>
+    <article>
+      <pre class="prettyprint" data-lang="scala">effectfully(Option("a").! + Option("b").!)</pre>
+      <ul>
+        <li><a href="https://github.com/pelotom/effectful">pelotom/effectful · GitHub</a></li>
+        <li>マクロで実装されている</li>
+      </ul>
+      <pre class="prettyprint" data-lang="scala">val F = Unapply.unapplyMA[Monad, Option, String](optionInstance).TC
+F.bind(Option("a"))(a => F.bind(Option("b"))(b => F.pure(a + b)))</pre>と展開される
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Effectful</h2>
+    </hgroup>
+    <article>
+      <p>Pros:</p>
+      <ul>
+        <li>読みやすい？</li>
+        <li>引数の制限がない</li>
+      </ul>
+      <p>Cons:</p>
+      <ul>
+        <li>bindを使っているので正確に言うとApplicative styleではない</li>
+        <li>implicit conversionが呼ばれないバグがある</li>
+      </ul>
+      <pre class="prettyprint" data-lang="scala">effectfully(Option("abc").!.count(_.isLetter)) // not work</pre>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Scala Idioms</h2>
+    </hgroup>
+    <article>
+      
+      <pre class="prettyprint" data-lang="scala">idiom[Option]($(Option("a") + Option("b")))</pre>
+      <ul>
+        <li><a href="https://github.com/aztek/scala-idioms">aztek/scala-idioms · GitHub</a></li>
+        <li>マクロパラダイスのUntypedマクロで実装されている</li>
+      </ul>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Scala Idioms</h2>
+    </hgroup>
+    <article>
+      <p>Pros:</p>
+      <ul>
+        <li>Scalazがいらない</li>
+      </ul>
+      <p>Cons:</p>
+      <ul>
+        <li>マクロパラダイスじゃないと使えない</li>
+      </ul>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Summary</h2>
+    </hgroup>
+    <article>
+      <ul>
+        <li></li>
+      </ul>
+    </article>
+  </slide>
+
+  <slide class="backdrop"></slide>
+</slides>
+
+<script>
+(function() {
+  var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
+</script>
+</body>
+</html>
