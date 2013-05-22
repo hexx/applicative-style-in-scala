@@ -43,6 +43,22 @@ URL: https://code.google.com/p/io-2012-slides
       <ul>
         <li>Applicative Functorを使った記述スタイル</li>
         <li>『<a href="http://www.soi.city.ac.uk/%7Eross/papers/Applicative.html">Applicative programming with effects</a>』で紹介された</li>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Applicative Functor</h2>
+    </hgroup>
+    <article>
+      <p>Applicative Functorは以下の三つの関数を持つ</p>
+      <pre class="prettyprint" data-lang="scala">def map[A, B](fa: F[A])(f: A => B): F[B] // Functor
+def pure[A](a: => A): F[A]
+def ap[A, B](fa: => F[A])(f: => F[A => B]): F[B]</pre>
+      <ul>
+        <li>Functor ← Applicative Functor ← Monadという継承関係</li>
+        <li>Applicative Functorは(Monadとは違って)合成に関して閉じている<br>(Applicative Functorを合成すると必ずApplicative Functorになる)</li>
+        <li>以上の性質からMonadを使わずにApplicative Styleで書けるなら、そのほうが良いと言われている(<b>Haskellでは</b>)</li>
       </ul>
     </article>
   </slide>
@@ -80,7 +96,7 @@ URL: https://code.google.com/p/io-2012-slides
       <pre class="prettyprint" data-lang="scala">^(Option("a"), Option("b"))(_ + _)</pre>
       <p>Pros:</p>
       <ul>
-        <li>中間生成オブジェクトが少なくオーバーヘッドが少ない</li>
+        <li>中間生成オブジェクトが少なくオーバーヘッドが少ない<br>「Function0 が引数の数だけ生成されるので、中間オブジェクトが本当に少ないのかは結構微妙」 by xuwei-k</li>
         <li>Applicative styleをやりたいならこれで書けるものはこれで書くというのが無難</li>
       </ul>
     </article>
@@ -93,15 +109,13 @@ URL: https://code.google.com/p/io-2012-slides
     <article>
       <p>Cons:</p>
       <ul>
-        <li>7引数の関数までしか定義されていない(applyを直接呼べば12引数までOK)
-        <pre class="prettyprint" data-lang="scala">val F = implicitly[Apply[Option]]
-F.apply2(Option(1), Option(2))(_ + _)</pre></li>
+        <li>7引数の関数までしか定義されていない(applyを直接呼べば12引数までOK)</li>
         <li>複数の型パラメータを受け取る型コンストラクタ(EitherやFunction2など)でうまく動作しない
-        <!-- <li><a href="https://github.com/scalaz/scalaz/issues/144">alternative applicative builder syntax doesn't work for type-classes of multiple arity · Issue #144 · scalaz/scalaz</a></li> -->
         <pre class="prettyprint" data-lang="scala">^("a".right[Int], "b".right[Int])(_ + _) // not work</pre></li>
-        <li>Unapplyを使うことで回避可能</li>
-        <pre class="prettyprint" data-lang="scala">val F = Unapply.unapplyMAB2[Monad, \/, Int, String].TC
-F.apply2("a".right[Int], "b".right[Int])(_ + _)</pre>
+        <li>以下のように回避することもできる
+        <pre class="prettyprint" data-lang="scala">val F = Apply[({type l[a]=Int\/a})#l]
+import F.applySyntax._
+^("a".right,"b".right)(_ + _) // by xuwei-k</pre></li>
       </ul>
     </article>
   </slide>
@@ -128,6 +142,34 @@ F.apply2("a".right[Int], "b".right[Int])(_ + _)</pre>
 
   <slide>
     <hgroup>
+      <h2>Scalaz Applyを直接使う</h2>
+    </hgroup>
+    <article>
+      <p>やや冗長だが直接Applyインスタンスを呼び出すことができる</p>
+      <pre class="prettyprint" data-lang="scala">Apply[Option].apply2(Option("a"), Option("b"))(_ + _)</pre>
+      <p>合成もできる</p>
+      <pre class="prettyprint" data-lang="scala">val F = Apply[List] compose Apply[Option]
+F.apply2(List(Option("a")), List(Option("b")))(_ + _)
+// => List(Option("ab"))</pre>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Scalaz Applyを直接使う</h2>
+    </hgroup>
+    <article>
+      <p>複数の型パラメータを受け取る型コンストラクタの場合</p>
+      <pre class="prettyprint" data-lang="scala">val F = Apply[({type l[a]=Int\/a})#l]
+F.apply2("a".right, "b".right)(_ + _)</pre>
+      <p>Unapplyを使ってもよい</p>
+      <pre class="prettyprint" data-lang="scala">val F = Unapply.unapplyMAB2[Apply, \/, Int, String].TC
+F.apply2("a".right, "b".right)(_ + _)</pre>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
       <h2>Effectful</h2>
     </hgroup>
     <article>
@@ -137,7 +179,7 @@ F.apply2("a".right[Int], "b".right[Int])(_ + _)</pre>
         <li>マクロで実装されている</li>
       </ul>
       <pre class="prettyprint" data-lang="scala">val F = Unapply.unapplyMA[Monad, Option, String](optionInstance).TC
-F.bind(Option("a"))(a => F.bind(Option("b"))(b => F.pure(a + b)))</pre>と展開される
+F.bind(Option("a"))(a => F.bind(Option("b"))(b => F.pure(a + b)))</pre><p>と展開される</p>
     </article>
   </slide>
 
@@ -165,12 +207,46 @@ F.bind(Option("a"))(a => F.bind(Option("b"))(b => F.pure(a + b)))</pre>と展開
       <h2>Scala Idioms</h2>
     </hgroup>
     <article>
-      
       <pre class="prettyprint" data-lang="scala">idiom[Option]($(Option("a") + Option("b")))</pre>
       <ul>
         <li><a href="https://github.com/aztek/scala-idioms">aztek/scala-idioms · GitHub</a></li>
         <li>マクロパラダイスのUntypedマクロで実装されている</li>
+        <li>この表記法はIdrisというプログラミング言語の「idioms notation」からいただいているらしい</li>
       </ul>
+      <pre class="prettyprint" data-lang="scala">idioms.option.app(
+  idioms.option.map(
+    (a: String) => (b: String) => a + b
+  )(Option("a"))
+)(Option("b"))</pre>
+      <p>と展開される</p>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Scala Idioms</h2>
+    </hgroup>
+    <article>
+      <p>型を指定する方法と
+        <pre class="prettyprint" data-lang="scala">idiom[List]($(List(1,2,3) * List(4,5,6)))
+// => List(4, 5, 6, 8, 10, 12, 12, 15, 18)</pre></p>
+      <p>型クラスインスタンスを直接指定する方法がある
+        <pre class="prettyprint" data-lang="scala">idiom(zipList)($(List(1,2,3) * List(4,5,6)))
+// => List(4, 10, 18)</pre></p>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Scala Idioms</h2>
+    </hgroup>
+    <article>
+      <p>式全体が$で囲まれている場合以下のような記法もある
+        <pre class="prettyprint" data-lang="scala">$[Option](Option("a") + Option("b"))</pre>
+      </p>
+      <p>合成もできる
+        <pre class="prettyprint" data-lang="scala">idiom(list $ option)($(List(Option("a")) + List(Option("b"))))</pre>
+      </p>
     </article>
   </slide>
 
@@ -182,10 +258,12 @@ F.bind(Option("a"))(a => F.bind(Option("b"))(b => F.pure(a + b)))</pre>と展開
       <p>Pros:</p>
       <ul>
         <li>Scalazがいらない</li>
+        <li>わりと素直に展開されてオーバーヘッドも少なさそう</li>
       </ul>
       <p>Cons:</p>
       <ul>
         <li>マクロパラダイスじゃないと使えない</li>
+        <li>コンテキストの型を指定しないといけない</li>
       </ul>
     </article>
   </slide>
