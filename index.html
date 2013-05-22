@@ -274,7 +274,10 @@ F.bind(Option("a"))(a => F.bind(Option("b"))(b => F.pure(a + b)))</pre><p>と展
     </hgroup>
     <article>
       <ul>
-        <li></li>
+        <li>Scalaz Applyはいくつか書き方を使い分けなきゃいけないのが面倒くさい</li>
+        <li>Effectfulは今のところ微妙</li>
+        <li>Scala IdiomsはUntypedマクロの参考に</li>
+        <li><b>forで十分です</b></li>
       </ul>
     </article>
   </slide>
